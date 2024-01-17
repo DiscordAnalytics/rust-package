@@ -1,17 +1,18 @@
 use http::header;
 
 pub struct DiscordAnalytics {
-  client: serenity::Client,
   api_token: String,
   headers: http::HeaderMap,
 }
 
 impl DiscordAnalytics {
-  pub fn new(client: serenity::Client, api_token: String) -> DiscordAnalytics {
+  pub fn new(api_token: String) -> DiscordAnalytics {
     let mut headers = header::HeaderMap::new();
+    let mut autorization_string = String::from("Bot ");
+    autorization_string.push_str(&api_token);
     headers.insert(
       header::AUTHORIZATION,
-      header::HeaderValue::from_str(&api_token).unwrap(),
+      header::HeaderValue::from_str(&autorization_string).unwrap(),
     );
     headers.insert(
       header::CONTENT_TYPE,
@@ -19,8 +20,7 @@ impl DiscordAnalytics {
     );
 
     DiscordAnalytics {
-      client: client,
-      api_token: api_token,
+      api_token,
       headers
     }
   }

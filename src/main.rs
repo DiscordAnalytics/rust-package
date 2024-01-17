@@ -3,6 +3,7 @@ mod discordanalytics;
 
 use std::env;
 
+use discordanalytics::discordanalytics::DiscordAnalytics;
 use dotenv::dotenv;
 
 use serenity::async_trait;
@@ -35,7 +36,11 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
+        let da_token = env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment");
+
         println!("{} is connected!", ready.user.name);
+
+        let da_client = DiscordAnalytics::new(da_token);
 
         let global_command =
             Command::create_global_command(&ctx.http, commands::test::register())
@@ -49,19 +54,13 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
 
-    // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    // Build our client.
     let mut client = Client::builder(token, GatewayIntents::empty())
         .event_handler(Handler)
         .await
         .expect("Error creating client");
 
-    // Finally, start a single shard, and start listening to events.
-    //
-    // Shards will automatically attempt to reconnect, and will perform exponential backoff until
-    // it reconnects.
     if let Err(why) = client.start().await {
         println!("Client error: {why:?}");
     }
