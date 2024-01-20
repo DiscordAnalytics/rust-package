@@ -38,11 +38,14 @@ impl EventHandler for Handler {
   async fn ready(&self, ctx: Context, ready: Ready) {
     println!("{} is connected!", ready.user.name);
 
+    let discord_analytics = DiscordAnalytics::new(ready, env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"));
+    discord_analytics.track_events().await;
+
     let global_command =
       Command::create_global_command(&ctx.http, commands::test::register())
         .await;
 
-    println!("I created the following global slash command: {global_command:#?}");
+    println!("I created the following global slash command: {:?}", global_command.unwrap().name);
   }
 }
 
@@ -60,7 +63,4 @@ async fn main() {
   if let Err(why) = client.start().await {
     println!("Client error: {why:?}");
   }
-
-  let da_token = env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment");
-  let da = DiscordAnalytics::new(client, da_token);
 }
