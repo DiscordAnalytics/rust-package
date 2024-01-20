@@ -3,17 +3,9 @@ use serde_json::json;
 use serenity::model::gateway::Ready;
 
 mod api_endpoints {
-  pub const BASE_URL: &str = "https://discordanalytics.xyz/api";
+  pub const BASE_URL: &str = "http://localhost:3001/api";
   pub const EDIT_SETTINGS_URL: &str = "/bots/:id";
   pub const EDIT_STATS_URL: &str = "/bots/:id/stats";
-}
-
-mod settings {
-  pub const trackInteraction: bool = true;
-  pub const trackGuilds: bool = true;
-  pub const trackGuildsLocale: bool = true;
-  pub const trackUserCount: bool = true;
-  pub const trackUserLanguage: bool = true;
 }
 
 pub struct DiscordAnalytics {
@@ -54,13 +46,7 @@ impl DiscordAnalytics {
         "username": self.client.user.name,
         "avatar": self.client.user.avatar,
         "framework": "serenity",
-        "settings": {
-          "trackInteraction": settings::trackInteraction,
-          "trackGuilds": settings::trackGuilds,
-          "trackGuildsLocale": settings::trackGuildsLocale,
-          "trackUserCount": settings::trackUserCount,
-          "trackUserLanguage": settings::trackUserLanguage,
-        }
+        "version": "0.1.0",
       }))
       .send()
       .await

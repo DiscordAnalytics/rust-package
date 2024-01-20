@@ -18,7 +18,7 @@ struct Handler;
 impl EventHandler for Handler {
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
     if let Interaction::Command(command) = interaction {
-      println!("Received command interaction: {command:#?}");
+      println!("Received command interaction: {:#?}", command.data.name);
 
       let content = match command.data.name.as_str() {
         "test" => Some(commands::test::run(&command.data.options())),
