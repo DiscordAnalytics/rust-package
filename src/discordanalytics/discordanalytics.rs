@@ -1,12 +1,15 @@
 use http::header;
+use serenity::Client;
+use crate::discordanalytics::interaction_handler;
 
 pub struct DiscordAnalytics {
+  client: Client,
   api_token: String,
   headers: http::HeaderMap,
 }
 
 impl DiscordAnalytics {
-  pub fn new(api_token: String) -> DiscordAnalytics {
+  pub fn new(client: Client, api_token: String) -> DiscordAnalytics {
     let mut headers = header::HeaderMap::new();
     let mut autorization_string = String::from("Bot ");
     autorization_string.push_str(&api_token);
@@ -20,6 +23,7 @@ impl DiscordAnalytics {
     );
 
     DiscordAnalytics {
+      client,
       api_token,
       headers
     }
