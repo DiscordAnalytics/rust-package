@@ -8,15 +8,20 @@ use dotenv::dotenv;
 
 use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::gateway::ActivityData;
 use serenity::model::application::{Command, Interaction};
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
-struct Handler;
+struct Handler {
+  discord_analytics: DiscordAnalytics
+}
 
 #[async_trait]
 impl EventHandler for Handler {
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+    self.discord_analytics.track_interactions(&interaction).await;
+
     if let Interaction::Command(command) = interaction {
       println!("Received command interaction: {:#?}", command.data.name);
 
@@ -38,8 +43,7 @@ impl EventHandler for Handler {
   async fn ready(&self, ctx: Context, ready: Ready) {
     println!("{} is connected!", ready.user.name);
 
-    let discord_analytics = DiscordAnalytics::new(ready, env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"));
-    discord_analytics.track_events().await;
+    self.discord_analytics.init(ready).await;
 
     let global_command =
       Command::create_global_command(&ctx.http, commands::test::register())
@@ -56,7 +60,10 @@ async fn main() {
   let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
   let mut client = Client::builder(token, GatewayIntents::empty())
-    .event_handler(Handler)
+    .event_handler(Handler {
+      discord_analytics: DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"))
+    })
+    .activity(ActivityData::playing("with serenity"))
     .await
     .expect("Error creating client");
 
