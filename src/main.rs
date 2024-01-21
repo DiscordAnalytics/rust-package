@@ -59,7 +59,7 @@ async fn main() {
 
   let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-  let mut client = Client::builder(token, GatewayIntents::empty())
+  let mut client = Client::builder(token, GatewayIntents::all())
     .event_handler(Handler {
       discord_analytics: DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"))
     })
