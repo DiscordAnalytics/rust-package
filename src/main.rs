@@ -2,6 +2,7 @@ mod commands;
 mod discordanalytics;
 
 use std::env;
+use std::sync::Arc;
 
 use discordanalytics::discordanalytics::DiscordAnalytics;
 use dotenv::dotenv;
@@ -14,13 +15,14 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler {
-  discord_analytics: DiscordAnalytics
+  discord_analytics: Arc<Mutex<DiscordAnalytics>>,
 }
 
 #[async_trait]
 impl EventHandler for Handler {
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-    self.discord_analytics.track_interactions(&interaction).await;
+    let mut discord_analytics = self.discord_analytics.lock().await;
+    discord_analytics.track_interactions(&interaction).await;
 
     if let Interaction::Command(command) = interaction {
       println!("Received command interaction: {:#?}", command.data.name);
@@ -43,7 +45,8 @@ impl EventHandler for Handler {
   async fn ready(&self, ctx: Context, ready: Ready) {
     println!("{} is connected!", ready.user.name);
 
-    self.discord_analytics.init(ready).await;
+    let mut discord_analytics = self.discord_analytics.lock().await;
+    discord_analytics.init(ready);
 
     let global_command =
       Command::create_global_command(&ctx.http, commands::test::register())
@@ -61,7 +64,7 @@ async fn main() {
 
   let mut client = Client::builder(token, GatewayIntents::all())
     .event_handler(Handler {
-      discord_analytics: DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"))
+      discord_analytics: Arc::new(Mutex::new(DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"))))
     })
     .activity(ActivityData::playing("with serenity"))
     .await

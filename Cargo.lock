@@ -224,7 +224,6 @@ dependencies = [
  "chrono",
  "dotenv",
  "reqwest",
- "serde_json",
  "serenity",
  "tokio",
 ]

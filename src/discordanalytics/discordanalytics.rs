@@ -1,9 +1,5 @@
 use reqwest::{Client,header};
-use serde_json::json;
-use serenity::model::{gateway::Ready, application::Interaction};
-// use tokio::time::Interval;
-// use std::time::Duration;
-// use std::collections::HashMap;
+use serenity::{json::{json, JsonMap}, model::{gateway::Ready, application::Interaction}};
 use chrono::Utc;
 use crate::discordanalytics::data::InteractionType;
 
@@ -25,7 +21,7 @@ mod error_codes {
 pub struct DiscordAnalytics {
   api_token: String,
   headers: header::HeaderMap,
-  data: Data
+  data: Vec<Data>,
 }
 
 impl DiscordAnalytics {
@@ -42,23 +38,26 @@ impl DiscordAnalytics {
       header::HeaderValue::from_static("application/json"),
     );
 
-    let data = Data {
-      date: Utc::now().format("%Y-%m-%d").to_string(),
-      guilds: 0,
-      users: 0,
-      interactions: Vec::new(),
-      locales: Vec::new(),
-      guildsLocales: Vec::new(),
-    };
+    let data = vec![
+      Data {
+        date: Utc::now().format("%Y-%m-%d").to_string(),
+        guilds: 0,
+        users: 0,
+        interactions: Vec::new(),
+        locales: Vec::new(),
+        guildsLocales: Vec::new(),
+      }
+    ];
 
     DiscordAnalytics {
       api_token,
       headers,
-      data
+      data,
     }
   }
 
-  pub async fn init(&self, ready: Ready) {
+  #[tokio::main]
+  pub async fn init(&mut self, ready: Ready) {
     let res = Client::new()
       .patch(&format!("{}{}", api_endpoints::BASE_URL, api_endpoints::EDIT_SETTINGS_URL.replace(":id", &ready.user.id.to_string())))
       .headers(self.headers.clone())
@@ -81,22 +80,102 @@ impl DiscordAnalytics {
     if res.status() != 200 {
       panic!("{}", error_codes::INVALID_RESPONSE);
     }
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+    loop {
+      interval.tick().await;
+
+      let guilds = ready.guilds.len() as i32;
+
+      // verify if the current data is from today, if not create a new one
+      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string());
+      if today_data.is_none() {
+        self.data.push(Data {
+          date: Utc::now().format("%Y-%m-%d").to_string(),
+          guilds,
+          users: 0,
+          interactions: Vec::new(),
+          locales: Vec::new(),
+          guildsLocales: Vec::new(),
+        });
+      }
+      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
+      println!("Today Data: {:#?}", today_data);
+    }
   }
 
-  pub async fn track_interactions(&self, interaction: &Interaction) {
+  pub async fn track_interactions(&mut self, interaction: &Interaction) {
     if let Interaction::Command(command) = interaction {
       println!("Discord Analytics received an interaction: {:#?}", command.data.name);
 
-      let user_locale = command.user.locale.clone();
-      let guild_locale = command.guild_locale.clone();
+      let user_locale = command.user.locale.clone().unwrap_or("en-US".to_string());
+      let guild_locale = command.guild_locale.clone().unwrap_or("en-US".to_string());
 
       let interaction_name = command.data.name.clone();
-      let interaction_type = InteractionType::ApplicationCommand;
+      let interaction_type = InteractionType::ApplicationCommand.to_string();
 
       println!("User locale: {:#?}", user_locale);
       println!("Guild locale: {:#?}", guild_locale);
       println!("Interaction name: {:#?}", interaction_name);
       println!("Interaction type: {:#?}", interaction_type);
+
+      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
+
+      // let mut user_locale_found = false;
+      // for locale_data in &mut today_data.locales {
+      //   if locale_data.locale == user_locale {
+      //     user_locale_found = true;
+      //     locale_data.number += 1;
+      //   }
+      // }
+      // if !user_locale_found {
+      //   today_data.locales.push(super::data::LocaleData {
+      //     locale: user_locale,
+      //     number: 1,
+      //   });
+      // }
+
+      // let mut guild_locale_found = false;
+      // for locale_data in &mut today_data.guildsLocales {
+      //   if locale_data.locale == guild_locale {
+      //     guild_locale_found = true;
+      //     locale_data.number += 1;
+      //   }
+      // }
+      // if !guild_locale_found {
+      //   today_data.guildsLocales.push(super::data::LocaleData {
+      //     locale: guild_locale,
+      //     number: 1,
+      //   });
+      // }
+
+      let mut interaction_found = false;
+      for data_interaciton in &mut today_data.interactions {
+        if data_interaciton.is_empty() {
+          data_interaciton.insert("name".to_string(), json!(interaction_name));
+          data_interaciton.insert("number".to_string(), json!(1));
+          data_interaciton.insert("type".to_string(), json!(interaction_type));
+        }
+        if data_interaciton["name"] == interaction_name && data_interaciton["type"] == interaction_type {
+          interaction_found = true;
+          if let Some(number) = data_interaciton.get_mut("number") {
+            if let Some(n) = number.as_i64() {
+              *number = json!(n + 1);
+            }
+          }
+        }
+      }
+      if !interaction_found {
+        today_data.interactions.push(JsonMap::from_iter(vec![
+          ("name".to_string(), json!(interaction_name)),
+          ("number".to_string(), json!(1)),
+          ("type".to_string(), json!(interaction_type)),
+        ]));
+      }
+
+      today_data.users += 1;
+
+      println!("Today Data: {:#?}", today_data);
     }
   }
 }
