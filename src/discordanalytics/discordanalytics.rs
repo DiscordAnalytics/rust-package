@@ -56,7 +56,6 @@ impl DiscordAnalytics {
     }
   }
 
-  #[tokio::main]
   pub async fn init(&mut self, ready: Ready) {
     let res = Client::new()
       .patch(&format!("{}{}", api_endpoints::BASE_URL, api_endpoints::EDIT_SETTINGS_URL.replace(":id", &ready.user.id.to_string())))
@@ -81,27 +80,27 @@ impl DiscordAnalytics {
       panic!("{}", error_codes::INVALID_RESPONSE);
     }
 
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
-    loop {
-      interval.tick().await;
+    // let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+    // loop {
+    //   interval.tick().await;
 
-      let guilds = ready.guilds.len() as i32;
+    //   let guilds = ready.guilds.len() as i32;
 
-      // verify if the current data is from today, if not create a new one
-      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string());
-      if today_data.is_none() {
-        self.data.push(Data {
-          date: Utc::now().format("%Y-%m-%d").to_string(),
-          guilds,
-          users: 0,
-          interactions: Vec::new(),
-          locales: Vec::new(),
-          guildsLocales: Vec::new(),
-        });
-      }
-      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
-      println!("Today Data: {:#?}", today_data);
-    }
+    //   // verify if the current data is from today, if not create a new one
+    //   let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string());
+    //   if today_data.is_none() {
+    //     self.data.push(Data {
+    //       date: Utc::now().format("%Y-%m-%d").to_string(),
+    //       guilds,
+    //       users: 0,
+    //       interactions: Vec::new(),
+    //       locales: Vec::new(),
+    //       guildsLocales: Vec::new(),
+    //     });
+    //   }
+    //   let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
+    //   println!("Today Data: {:#?}", today_data);
+    // }
   }
 
   pub async fn track_interactions(&mut self, interaction: &Interaction) {
