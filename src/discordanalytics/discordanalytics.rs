@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use reqwest::{Client,header};
 use serenity::{json::{json, JsonMap}, model::{gateway::Ready, application::Interaction}};
 use chrono::Utc;
+use tokio::sync::Mutex;
 use crate::discordanalytics::data::InteractionType;
 
 use super::data::Data;
@@ -25,7 +28,7 @@ pub struct DiscordAnalytics {
 }
 
 impl DiscordAnalytics {
-  pub fn new(api_token: String) -> DiscordAnalytics {
+  pub fn new(api_token: String) -> Arc<Mutex<Self>> {
     let mut headers = header::HeaderMap::new();
     let mut autorization_string = String::from("Bot ");
     autorization_string.push_str(&api_token);
@@ -49,11 +52,11 @@ impl DiscordAnalytics {
       }
     ];
 
-    DiscordAnalytics {
+    Arc::new(Mutex::new(Self {
       api_token,
       headers,
       data,
-    }
+    }))
   }
 
   pub async fn init(&mut self, ready: Ready) {
@@ -79,28 +82,6 @@ impl DiscordAnalytics {
     if res.status() != 200 {
       panic!("{}", error_codes::INVALID_RESPONSE);
     }
-
-    // let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
-    // loop {
-    //   interval.tick().await;
-
-    //   let guilds = ready.guilds.len() as i32;
-
-    //   // verify if the current data is from today, if not create a new one
-    //   let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string());
-    //   if today_data.is_none() {
-    //     self.data.push(Data {
-    //       date: Utc::now().format("%Y-%m-%d").to_string(),
-    //       guilds,
-    //       users: 0,
-    //       interactions: Vec::new(),
-    //       locales: Vec::new(),
-    //       guildsLocales: Vec::new(),
-    //     });
-    //   }
-    //   let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
-    //   println!("Today Data: {:#?}", today_data);
-    // }
   }
 
   pub async fn track_interactions(&mut self, interaction: &Interaction) {

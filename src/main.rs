@@ -64,7 +64,7 @@ async fn main() {
 
   let mut client = Client::builder(token, GatewayIntents::all())
     .event_handler(Handler {
-      discord_analytics: Arc::new(Mutex::new(DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment"))))
+      discord_analytics: DiscordAnalytics::new(env::var("DISCORD_ANALYTICS_TOKEN").expect("Expected a token in the environment")),
     })
     .activity(ActivityData::playing("with serenity"))
     .await
