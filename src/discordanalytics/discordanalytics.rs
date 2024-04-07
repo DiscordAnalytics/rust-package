@@ -1,161 +1,194 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use reqwest::{Client,header};
-use serenity::{json::{json, JsonMap}, model::{gateway::Ready, application::Interaction}};
+use serenity::{client::Context, json::json, model::gateway::Ready};
 use chrono::Utc;
-use tokio::sync::Mutex;
-use crate::discordanalytics::data::InteractionType;
 
-use super::data::Data;
+use crate::discordanalytics::data::{Data, GuildMembersData};
 
 mod api_endpoints {
-  pub const BASE_URL: &str = "http://localhost:3001/api";
-  pub const EDIT_SETTINGS_URL: &str = "/bots/:id";
-  pub const EDIT_STATS_URL: &str = "/bots/:id/stats";
+  pub const BASE_URL: &str = "https://discordanalytics.xyz/api";
+  pub const BOT_URL: &str = "/bots/:id";
+  pub const STATS_URL: &str = "/bots/:id/stats";
 }
 
 mod error_codes {
+  pub const INVALID_CLIENT_TYPE: &str = "Invalid client type, please use a valid client.";
+  pub const CLIENT_NOT_READY: &str = "Client is not ready, please start the client first.";
   pub const INVALID_RESPONSE: &str = "Invalid response from the API, please try again later.";
   pub const INVALID_API_TOKEN: &str = "Invalid API token, please get one at https://discordanalytics.xyz and try again.";
   pub const DATA_NOT_SENT: &str = "Data cannot be sent to the API, I will try again in a minute.";
   pub const SUSPENDED_BOT: &str = "Your bot has been suspended, please check your mailbox for more information.";
+  pub const INSTANCE_NOT_INITIALIZED: &str = "It seem that you didn't initialize your instance. Please check the docs for more informations.";
 }
 
 pub struct DiscordAnalytics {
-  api_token: String,
+  api_key: String,
+  debug: bool,
+  is_ready: bool,
   headers: header::HeaderMap,
-  data: Vec<Data>,
+  data: Data,
 }
 
 impl DiscordAnalytics {
-  pub fn new(api_token: String) -> Arc<Mutex<Self>> {
+  pub fn new(api_key: String, debug: bool) -> Self {
     let mut headers = header::HeaderMap::new();
-    let mut autorization_string = String::from("Bot ");
-    autorization_string.push_str(&api_token);
-    headers.insert(
-      header::AUTHORIZATION,
-      header::HeaderValue::from_str(&autorization_string).unwrap(),
-    );
-    headers.insert(
-      header::CONTENT_TYPE,
-      header::HeaderValue::from_static("application/json"),
-    );
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert("Authorization", format!("Bot {}", api_key).parse().unwrap());
 
-    let data = vec![
-      Data {
+    DiscordAnalytics {
+      api_key,
+      debug,
+      is_ready: false,
+      headers,
+      data: Data {
         date: Utc::now().format("%Y-%m-%d").to_string(),
         guilds: 0,
         users: 0,
         interactions: Vec::new(),
         locales: Vec::new(),
-        guildsLocales: Vec::new(),
-      }
-    ];
-
-    Arc::new(Mutex::new(Self {
-      api_token,
-      headers,
-      data,
-    }))
+        guilds_locales: Vec::new(),
+        guild_members: GuildMembersData {
+          little: 0,
+          medium: 0,
+          big: 0,
+          huge: 0,
+        },
+      },
+    }
   }
 
-  pub async fn init(&mut self, ready: Ready) {
-    let res = Client::new()
-      .patch(&format!("{}{}", api_endpoints::BASE_URL, api_endpoints::EDIT_SETTINGS_URL.replace(":id", &ready.user.id.to_string())))
+  pub async fn initialize(&mut self, ready: Ready) {
+    let response = Client::new()
+      .patch(
+        format!(
+          "{}{}",
+          api_endpoints::BASE_URL, api_endpoints::BOT_URL.replace(":id", &ready.user.id.to_string())
+        )
+      )
       .headers(self.headers.clone())
       .json(&json!({
         "username": ready.user.name,
         "avatar": ready.user.avatar,
         "framework": "serenity",
-        "version": "0.1.0",
+        "version": env!("CARGO_PKG_VERSION"),
       }))
       .send()
       .await
       .unwrap();
 
-    if res.status() == 401 {
+    if response.status() == 401 {
       panic!("{}", error_codes::INVALID_API_TOKEN);
     }
-    if res.status() == 423 {
+    if response.status() == 423 {
       panic!("{}", error_codes::SUSPENDED_BOT);
     }
-    if res.status() != 200 {
+    if response.status() != 200 {
       panic!("{}", error_codes::INVALID_RESPONSE);
+    }
+
+    if self.debug {
+      println!("[DISCORDANALYTICS] Instance successfully initialized");
+    }
+    self.is_ready = true;
+
+    if self.debug {
+      // check if --dev is in launch arguments
+      if std::env::args().any(|arg| arg == "--dev") {
+        println!("[DISCORDANALYTICS] DevMode is enabled. Stats will be sent every 30s.");
+      } else {
+        println!("[DISCORDANALYTICS] DevMode is disabled. Stats will be sent every 5 minutes.");
+      }
     }
   }
 
-  pub async fn track_interactions(&mut self, interaction: &Interaction) {
-    if let Interaction::Command(command) = interaction {
-      println!("Discord Analytics received an interaction: {:#?}", command.data.name);
-
-      let user_locale = command.user.locale.clone().unwrap_or("en-US".to_string());
-      let guild_locale = command.guild_locale.clone().unwrap_or("en-US".to_string());
-
-      let interaction_name = command.data.name.clone();
-      let interaction_type = InteractionType::ApplicationCommand.to_string();
-
-      println!("User locale: {:#?}", user_locale);
-      println!("Guild locale: {:#?}", guild_locale);
-      println!("Interaction name: {:#?}", interaction_name);
-      println!("Interaction type: {:#?}", interaction_type);
-
-      let today_data = self.data.iter_mut().find(|data| data.date == Utc::now().format("%Y-%m-%d").to_string()).unwrap();
-
-      // let mut user_locale_found = false;
-      // for locale_data in &mut today_data.locales {
-      //   if locale_data.locale == user_locale {
-      //     user_locale_found = true;
-      //     locale_data.number += 1;
-      //   }
-      // }
-      // if !user_locale_found {
-      //   today_data.locales.push(super::data::LocaleData {
-      //     locale: user_locale,
-      //     number: 1,
-      //   });
-      // }
-
-      // let mut guild_locale_found = false;
-      // for locale_data in &mut today_data.guildsLocales {
-      //   if locale_data.locale == guild_locale {
-      //     guild_locale_found = true;
-      //     locale_data.number += 1;
-      //   }
-      // }
-      // if !guild_locale_found {
-      //   today_data.guildsLocales.push(super::data::LocaleData {
-      //     locale: guild_locale,
-      //     number: 1,
-      //   });
-      // }
-
-      let mut interaction_found = false;
-      for data_interaciton in &mut today_data.interactions {
-        if data_interaciton.is_empty() {
-          data_interaciton.insert("name".to_string(), json!(interaction_name));
-          data_interaciton.insert("number".to_string(), json!(1));
-          data_interaciton.insert("type".to_string(), json!(interaction_type));
-        }
-        if data_interaciton["name"] == interaction_name && data_interaciton["type"] == interaction_type {
-          interaction_found = true;
-          if let Some(number) = data_interaciton.get_mut("number") {
-            if let Some(n) = number.as_i64() {
-              *number = json!(n + 1);
-            }
-          }
-        }
-      }
-      if !interaction_found {
-        today_data.interactions.push(JsonMap::from_iter(vec![
-          ("name".to_string(), json!(interaction_name)),
-          ("number".to_string(), json!(1)),
-          ("type".to_string(), json!(interaction_type)),
-        ]));
-      }
-
-      today_data.users += 1;
-
-      println!("Today Data: {:#?}", today_data);
+  pub async fn send_data(&mut self, ctx: Arc<Context>) {
+    if !self.is_ready {
+      panic!("{}", error_codes::INSTANCE_NOT_INITIALIZED);
     }
+
+    if self.debug {
+      println!("[DISCORDANALYTICS] Sending stats...");
+    }
+
+    let guild_count = ctx.cache.guild_count() as i32;
+    let user_count = ctx.cache.user_count() as i32;
+
+    let response = Client::new()
+      .post(
+        format!(
+          "{}{}",
+          api_endpoints::BASE_URL, api_endpoints::STATS_URL.replace(":id", &ctx.cache.current_user().id.to_string())
+        )
+      )
+      .headers(self.headers.clone())
+      .json(&json!({
+        "date": Utc::now().format("%Y-%m-%d").to_string(),
+        "guilds": guild_count,
+        "users": user_count,
+        "interactions": json!(self.data.interactions),
+        "locales": json!(self.data.locales),
+        "guildsLocales": json!(self.data.guilds_locales),
+        "guildMembers": json!(self.data.guild_members),
+      }))
+      .send()
+      .await
+      .unwrap();
+
+    if response.status() == 401 {
+      panic!("{}", error_codes::INVALID_API_TOKEN);
+    }
+    if response.status() == 423 {
+      panic!("{}", error_codes::SUSPENDED_BOT);
+    }
+    if response.status() != 200 {
+      panic!("{} {}", error_codes::INVALID_RESPONSE, response.text().await.unwrap());
+    }
+    if response.status().is_success() {
+      if self.debug {
+        println!("[DISCORDANALYTICS] Stats {} sent to the API", self.data);
+      }
+
+      self.data = Data {
+        date: Utc::now().format("%Y-%m-%d").to_string(),
+        guilds: guild_count,
+        users: user_count,
+        interactions: Vec::new(),
+        locales: Vec::new(),
+        guilds_locales: Vec::new(),
+        guild_members: self.calculate_guild_members_repartition(ctx),
+      };
+    }
+
+    tokio::time::sleep(Duration::from_secs(if std::env::args().any(|arg| arg == "--dev") { 30 } else { 300 })).await;
+  }
+
+  pub fn calculate_guild_members_repartition(&mut self, ctx: Arc<Context>) -> GuildMembersData {
+    let mut little = 0;
+    let mut medium = 0;
+    let mut big = 0;
+    let mut huge = 0;
+
+    for guild in ctx.cache.guilds() {
+      let guild = ctx.cache.guild(guild).unwrap();
+      let member_count = guild.member_count as i32;
+
+      if member_count <= 100 {
+        little += 1;
+      } else if member_count <= 500 {
+        medium += 1;
+      } else if member_count <= 1500 {
+        big += 1;
+      } else {
+        huge += 1;
+      }
+    }
+
+    return GuildMembersData {
+      little,
+      medium,
+      big,
+      huge,
+    };
   }
 }

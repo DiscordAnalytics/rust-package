@@ -1,21 +1,18 @@
 use std::fmt;
+use serde::Serialize;
 
-use serenity::json::JsonMap;
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum InteractionType {
-  Unknown,
-  Ping,
-  ApplicationCommand,
-  MessageComponent,
-  ApplicationCommandAutocomplete,
-  ModalSubmit,
+  Ping = 1,
+  ApplicationCommand = 2,
+  MessageComponent = 3,
+  ApplicationCommandAutocomplete = 4,
+  ModalSubmit = 5,
 }
 
 impl fmt::Display for InteractionType {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      InteractionType::Unknown => write!(f, "Unknown"),
       InteractionType::Ping => write!(f, "Ping"),
       InteractionType::ApplicationCommand => write!(f, "ApplicationCommand"),
       InteractionType::MessageComponent => write!(f, "MessageComponent"),
@@ -27,18 +24,44 @@ impl fmt::Display for InteractionType {
 
 pub type Locale = String;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Data {
   pub date: String,
   pub guilds: i32,
   pub users: i32,
-  pub interactions: Vec<JsonMap>,
+  pub interactions: Vec<InteractionData>,
   pub locales: Vec<LocaleData>,
-  pub guildsLocales: Vec<LocaleData>,
+  pub guilds_locales: Vec<LocaleData>,
+  pub guild_members: GuildMembersData,
 }
 
-#[derive(Debug)]
+impl fmt::Display for Data {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+      f,
+      "Data {{ date: {}, guilds: {}, users: {}, interactions: {:?}, locales: {:?}, guilds_locales: {:?}, guild_members: {:?} }}",
+      self.date, self.guilds, self.users, self.interactions, self.locales, self.guilds_locales, self.guild_members
+    )
+  }
+}
+
+#[derive(Debug, Serialize)]
+pub struct InteractionData {
+  pub name: String,
+  pub number: i32,
+  pub interaction_type: InteractionType,
+}
+
+#[derive(Debug, Serialize)]
 pub struct LocaleData {
   pub locale: Locale,
   pub number: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GuildMembersData {
+  pub little: i32,
+  pub medium: i32,
+  pub big: i32,
+  pub huge: i32,
 }
