@@ -13,11 +13,8 @@ mod api_endpoints {
 }
 
 mod error_codes {
-  pub const INVALID_CLIENT_TYPE: &str = "Invalid client type, please use a valid client.";
-  pub const CLIENT_NOT_READY: &str = "Client is not ready, please start the client first.";
   pub const INVALID_RESPONSE: &str = "Invalid response from the API, please try again later.";
   pub const INVALID_API_TOKEN: &str = "Invalid API token, please get one at https://discordanalytics.xyz and try again.";
-  pub const DATA_NOT_SENT: &str = "Data cannot be sent to the API, I will try again in a minute.";
   pub const SUSPENDED_BOT: &str = "Your bot has been suspended, please check your mailbox for more information.";
   pub const INSTANCE_NOT_INITIALIZED: &str = "It seem that you didn't initialize your instance. Please check the docs for more informations.";
 }
