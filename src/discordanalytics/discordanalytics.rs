@@ -20,7 +20,6 @@ mod error_codes {
 }
 
 pub struct DiscordAnalytics {
-  api_key: String,
   debug: bool,
   is_ready: bool,
   headers: header::HeaderMap,
@@ -34,7 +33,6 @@ impl DiscordAnalytics {
     headers.insert("Authorization", format!("Bot {}", api_key).parse().unwrap());
 
     DiscordAnalytics {
-      api_key,
       debug,
       is_ready: false,
       headers,
