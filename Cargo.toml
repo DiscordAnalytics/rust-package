@@ -1,7 +1,12 @@
 [package]
-name = "discord-analytics-rust"
+name = "discordanalytics"
 version = "0.1.0"
 edition = "2021"
+authors = ["ValDesign <valdesign.dev@gmail.com>"]
+description = "A rust crate for interacting with Discord Analytics API"
+homepage = "https://github.com/DiscordAnalytics/rust-package"
+repository = "https://github.com/DiscordAnalytics/rust-package.git"
+documentation = "https://docs.discordanalytics.xyz"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
