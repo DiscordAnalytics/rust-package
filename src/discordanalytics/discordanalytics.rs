@@ -1,10 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use reqwest::{Client,header};
-use serenity::{client::Context, json::json, model::gateway::Ready};
+use serenity::{client::Context, json::json, model::{gateway::Ready, application::Interaction}};
 use chrono::Utc;
 
-use crate::discordanalytics::data::{Data, GuildMembersData};
+use crate::discordanalytics::data::{Data, GuildMembersData, LocaleData, InteractionType, InteractionData};
 
 mod api_endpoints {
   pub const BASE_URL: &str = "https://discordanalytics.xyz/api";
@@ -19,6 +19,7 @@ mod error_codes {
   pub const INSTANCE_NOT_INITIALIZED: &str = "It seem that you didn't initialize your instance. Please check the docs for more informations.";
 }
 
+#[derive(Debug)]
 pub struct DiscordAnalytics {
   debug: bool,
   is_ready: bool,
@@ -185,5 +186,87 @@ impl DiscordAnalytics {
       big,
       huge,
     };
+  }
+
+  pub async fn track_interactions(&mut self, ctx: Arc<Context>, interaction: Interaction) {
+    if self.debug {
+      println!("[DISCORDANALYTICS] Track interactions triggered");
+    }
+    if !self.is_ready {
+      panic!("{}", error_codes::INSTANCE_NOT_INITIALIZED);
+    }
+
+    let mut guilds: Vec<LocaleData> = Vec::new();
+    for guild in ctx.cache.guilds() {
+      let g = ctx.cache.guild(guild).unwrap();
+      if !g.preferred_locale.is_empty() {
+        let mut found = false;
+        for locale in guilds.iter_mut() {
+          if locale.locale == g.preferred_locale {
+            locale.number += 1;
+            found = true;
+            break;
+          }
+        }
+        if !found {
+          guilds.push(LocaleData {
+            locale: g.preferred_locale.clone(),
+            number: 1,
+          });
+        }
+      }
+    }
+    self.data.guilds_locales = guilds;
+
+    let mut user_locale = String::new();
+    let mut interaction_name = String::new();
+    let mut interaction_type = InteractionType::Ping;
+    if let Interaction::Command(command) = interaction {
+      user_locale = command.locale.clone();
+      interaction_name = command.data.name.clone();
+      interaction_type = InteractionType::ApplicationCommand;
+    } else if let Interaction::Autocomplete(command) = interaction {
+      user_locale = command.locale.clone();
+      interaction_name = command.data.name.clone();
+      interaction_type = InteractionType::ApplicationCommandAutocomplete;
+    } else if let Interaction::Component(component) = interaction {
+      user_locale = component.locale.clone();
+      interaction_name = component.data.custom_id.clone();
+      interaction_type = InteractionType::MessageComponent;
+    } else if let Interaction::Modal(modal) = interaction {
+      user_locale = modal.locale.clone();
+      interaction_name = modal.data.custom_id.clone();
+      interaction_type = InteractionType::ModalSubmit;
+    }
+    let mut locale_found = false;
+    for locale in self.data.locales.iter_mut() {
+      if locale.locale == user_locale {
+        locale.number += 1;
+        locale_found = true;
+        break;
+      }
+    }
+    if !locale_found {
+      self.data.locales.push(LocaleData {
+        locale: user_locale,
+        number: 1,
+      });
+    }
+
+    let mut interaction_found = false;
+    for interaction in self.data.interactions.iter_mut() {
+      if interaction.name == interaction_name && interaction.interaction_type == interaction_type {
+        interaction.number += 1;
+        interaction_found = true;
+        break;
+      }
+    }
+    if !interaction_found {
+      self.data.interactions.push(InteractionData {
+        name: interaction_name,
+        number: 1,
+        interaction_type,
+      });
+    }
   }
 }

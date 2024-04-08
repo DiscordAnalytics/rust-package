@@ -49,6 +49,7 @@ impl fmt::Display for Data {
 pub struct InteractionData {
   pub name: String,
   pub number: i32,
+  #[serde(rename = "type")]
   pub interaction_type: InteractionType,
 }
 
