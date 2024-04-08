@@ -1,11 +1,10 @@
 mod commands;
-mod discordanalytics;
 
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use discordanalytics::discordanalytics::DiscordAnalytics;
+use discordanalytics::all::discordanalytics::DiscordAnalytics;
 use dotenv::dotenv;
 
 use serenity::async_trait;
